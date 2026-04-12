@@ -1,0 +1,18 @@
+# Datasets and run outputs (do not commit)
+data_grf_all_subjects_imu/
+data_grf_ab03_imu/
+runs_grf_si_loso/
+runs_grf_ab03/
+
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+.env
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

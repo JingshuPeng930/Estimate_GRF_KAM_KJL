@@ -1,8 +1,13 @@
-# IMU-only GRF estimation — subject-independent (LOSO)
+# Estimate GRF, KFM, and KJL from IMU
 
-Temporal convolutional network (TCN) training code for estimating vertical GRF (normalized by body weight) from IMU, evaluated with leave-one-subject-out (LOSO) splits.
+This repository is organized into two independent code paths:
 
-Training data are **not** included. Prepare your dataset locally or generate it from a project tree that contains `IMU_Data_Process/`.
+| Folder | Purpose |
+| --- | --- |
+| `grf_subject_independent/` | IMU-only vertical GRF estimation with subject-independent LOSO evaluation. |
+| `kjl_subject_dependent_cascaded/` | Subject-dependent KJL estimation for AB03 Amy using a cascaded `IMU + predicted GRF + predicted KFM` input. |
+
+Training datasets and model outputs are intentionally not committed. Place generated datasets and checkpoints in the paths described by each folder's README.
 
 ## Setup
 
@@ -12,40 +17,20 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 1) Build the multi-subject dataset (optional)
+## Quick Start
 
-Requires a directory layout with `IMU_Data_Process/<subject>/...` (see `generate_multisubject_grf_dataset.py` for subject names and paths). Output defaults to `./data_grf_all_subjects_imu/`.
-
-```bash
-python generate_multisubject_grf_dataset.py --project-root /path/to/parent-of-IMU_Data_Process
-```
-
-If `IMU_Data_Process` sits next to these scripts, you can omit `--project-root`.
-
-## 2) Train LOSO
-
-From this repository root (so `data_grf_all_subjects_imu/` is visible):
+Run subject-independent GRF LOSO:
 
 ```bash
-# All folds (hold out each subject once)
+cd grf_subject_independent
 python TCN_Training_GRF_SubjectIndependent_LOSO.py --all
-
-# Single fold
-python TCN_Training_GRF_SubjectIndependent_LOSO.py --held-out-subject AB08_Adrian
 ```
 
-Checkpoints and logs are written under `runs_grf_si_loso/`.
+Run subject-dependent cascaded KJL:
 
-## Files
+```bash
+cd kjl_subject_dependent_cascaded
+python run_pipeline_GRFKFM_KJL.py
+```
 
-| File | Role |
-|------|------|
-| `TCN_Training_GRF_SubjectIndependent_LOSO.py` | LOSO entry point |
-| `TCN_Training_GRF_AB03.py` | Training loop and hyperparameters |
-| `grf_ab03_tcn_dataset.py` | Windowed trials and dataloaders |
-| `TCN_Header_Model.py` | TCN architecture |
-| `generate_multisubject_grf_dataset.py` | Build aligned IMU/GRF trials from raw processed data |
-
-## License
-
-Add your license here if you publish this repository.
+The cascaded KJL pipeline checks for existing GRF/KFM upstream models first. If they are missing, it trains them automatically; use `--retrain-grf` and/or `--retrain-kfm` to force a fresh upstream run.

@@ -3,6 +3,14 @@ data_grf_all_subjects_imu/
 data_grf_ab03_imu/
 runs_grf_si_loso/
 runs_grf_ab03/
+grf_subject_independent/data*/
+grf_subject_independent/runs*/
+kjl_subject_dependent_cascaded/data/
+kjl_subject_dependent_cascaded/runs/
+kjl_subject_dependent_cascaded/upstream_grf/data*/
+kjl_subject_dependent_cascaded/upstream_grf/runs*/
+kjl_subject_dependent_cascaded/upstream_kfm/data*/
+kjl_subject_dependent_cascaded/upstream_kfm/runs*/
 
 # Python
 __pycache__/

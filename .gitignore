@@ -11,6 +11,8 @@ kjl_subject_dependent_cascaded/upstream_grf/data*/
 kjl_subject_dependent_cascaded/upstream_grf/runs*/
 kjl_subject_dependent_cascaded/upstream_kfm/data*/
 kjl_subject_dependent_cascaded/upstream_kfm/runs*/
+kjl_subject_independent_cascaded/data/
+kjl_subject_independent_cascaded/runs/
 
 # Python
 __pycache__/

@@ -10,6 +10,43 @@ IMU + predicted GRF + predicted KFM -> KJL model
 
 The final KJL model uses 26 input channels: 24 IMU channels plus one predicted vertical GRF channel and one predicted KFM channel. The default LOSO subjects are `AB02_Rajiv`, `AB03_Amy`, and `AB05_Maria`.
 
+## Fast Start With Included Data
+
+This repository includes a compressed generated-data archive tracked with Git LFS:
+
+```text
+kjl_subject_independent_cascaded/data_archive/kjl_subject_independent_cascaded_generated_data.tar.gz
+```
+
+After cloning, run:
+
+```bash
+git lfs install
+git lfs pull
+
+python kjl_subject_independent_cascaded/unpack_generated_data.py
+```
+
+The unpack step creates:
+
+```text
+kjl_subject_independent_cascaded/data/grf
+kjl_subject_independent_cascaded/data/kfm
+kjl_subject_independent_cascaded/data/kjl
+```
+
+Then train all LOSO folds:
+
+```bash
+python kjl_subject_independent_cascaded/run_pipeline_GRFKFM_KJL_SI_LOSO.py \
+  --window-size 150 \
+  --seed 42 \
+  --grf-epochs 30 \
+  --kfm-epochs 30 \
+  --kjl-epochs 50 \
+  --kjl-lr 1e-5
+```
+
 ## Folder Layout
 
 | Path | Role |
@@ -22,7 +59,7 @@ The final KJL model uses 26 input channels: 24 IMU channels plus one predicted v
 | `upstream_grf/` | GRF dataset generator, dataloader, model, and trainer used by the cascade. |
 | `upstream_kfm/` | KFM dataset generator, dataloader, model, and trainer used by the cascade. |
 
-Generated data and model outputs are intentionally not committed. They are expected under:
+Expanded generated data and model outputs are intentionally not committed. After unpacking the Git LFS archive, generated data are expected under:
 
 ```text
 kjl_subject_independent_cascaded/data/grf
@@ -31,19 +68,7 @@ kjl_subject_independent_cascaded/data/kjl
 kjl_subject_independent_cascaded/runs
 ```
 
-This repository also includes a compressed generated-data archive tracked with Git LFS:
-
-```text
-kjl_subject_independent_cascaded/data_archive/kjl_subject_independent_cascaded_generated_data.tar.gz
-```
-
-To unpack it:
-
-```bash
-python kjl_subject_independent_cascaded/unpack_generated_data.py
-```
-
-After unpacking, the LOSO pipeline can be run without regenerating data from raw OpenSim/IMU files.
+The archive contains only the generated training data needed by the pipeline: `Input/imu.csv`, `Label/*.csv`, `manifest.json`, and the LOSO split JSON files. It does not include raw `IMU_Data_Process`, `KJL_GT`, `ID_GT`, checkpoints, run outputs, or `aligned_debug.csv`.
 
 ## Setup
 

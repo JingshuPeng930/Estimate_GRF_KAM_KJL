@@ -8,7 +8,7 @@ This repository is organized into three independent code paths:
 | `kjl_subject_dependent_cascaded/` | Subject-dependent KJL estimation for AB03 Amy using a cascaded `IMU + predicted GRF + predicted KFM` input. |
 | `kjl_subject_independent_cascaded/` | Subject-independent LOSO KJL estimation using the cascaded `IMU + predicted GRF + predicted KFM` input. |
 
-Training datasets and model outputs are intentionally not committed. Place generated datasets and checkpoints in the paths described by each folder's README.
+Training outputs and expanded datasets are intentionally not committed. The subject-independent cascaded KJL folder includes a Git LFS data archive that can be unpacked into the expected training-data folders.
 
 ## Setup
 
@@ -19,6 +19,23 @@ pip install -r requirements.txt
 ```
 
 ## Quick Start
+
+If you want to run the subject-independent cascaded KJL model directly after cloning, install Git LFS and unpack the included generated-data archive first:
+
+```bash
+git lfs install
+git lfs pull
+
+python kjl_subject_independent_cascaded/unpack_generated_data.py
+```
+
+This creates:
+
+```text
+kjl_subject_independent_cascaded/data/grf
+kjl_subject_independent_cascaded/data/kfm
+kjl_subject_independent_cascaded/data/kjl
+```
 
 Run subject-independent GRF LOSO:
 
@@ -39,6 +56,11 @@ The cascaded KJL pipeline checks for existing GRF/KFM upstream models first. If 
 Run subject-independent cascaded KJL LOSO:
 
 ```bash
-cd kjl_subject_independent_cascaded
-python run_pipeline_GRFKFM_KJL_SI_LOSO.py --window-size 150 --seed 42 --kjl-lr 1e-5
+python kjl_subject_independent_cascaded/run_pipeline_GRFKFM_KJL_SI_LOSO.py \
+  --window-size 150 \
+  --seed 42 \
+  --grf-epochs 30 \
+  --kfm-epochs 30 \
+  --kjl-epochs 50 \
+  --kjl-lr 1e-5
 ```

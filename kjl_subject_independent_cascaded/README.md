@@ -31,6 +31,20 @@ kjl_subject_independent_cascaded/data/kjl
 kjl_subject_independent_cascaded/runs
 ```
 
+This repository also includes a compressed generated-data archive tracked with Git LFS:
+
+```text
+kjl_subject_independent_cascaded/data_archive/kjl_subject_independent_cascaded_generated_data.tar.gz
+```
+
+To unpack it:
+
+```bash
+python kjl_subject_independent_cascaded/unpack_generated_data.py
+```
+
+After unpacking, the LOSO pipeline can be run without regenerating data from raw OpenSim/IMU files.
+
 ## Setup
 
 From the repository root:
@@ -43,7 +57,7 @@ pip install -r kjl_subject_independent_cascaded/requirements.txt
 
 ## Prepare Data
 
-Place the raw processing folders in the repository root, using the same names as the lab workspace:
+If you want to regenerate the datasets from raw files instead of using the included archive, place the raw processing folders in the repository root, using the same names as the lab workspace:
 
 ```text
 IMU_Data_Process/

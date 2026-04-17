@@ -33,6 +33,9 @@ The unpack step creates:
 kjl_subject_independent_cascaded/data/grf
 kjl_subject_independent_cascaded/data/kfm
 kjl_subject_independent_cascaded/data/kjl
+kjl_subject_independent_cascaded/data/grf_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double
 ```
 
 Then train all LOSO folds:
@@ -66,10 +69,13 @@ Expanded generated data and model outputs are intentionally not committed. After
 kjl_subject_independent_cascaded/data/grf
 kjl_subject_independent_cascaded/data/kfm
 kjl_subject_independent_cascaded/data/kjl
+kjl_subject_independent_cascaded/data/grf_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double
 kjl_subject_independent_cascaded/runs
 ```
 
-The archive contains only the generated training data needed by the pipeline: `Input/imu.csv`, `Label/*.csv`, `manifest.json`, and the LOSO split JSON files. It does not include raw `IMU_Data_Process`, `KJL_GT`, `ID_GT`, checkpoints, run outputs, or `aligned_debug.csv`.
+The archive contains the latest generated training data used for the standard cascaded LOSO runs and the doubled unilateral runs: `Input/imu.csv`, `Label/*.csv`, `manifest.json`, and the LOSO split JSON files. It does not include raw `IMU_Data_Process`, `KJL_GT`, `ID_GT`, checkpoints, run outputs, or `aligned_debug.csv`.
 
 ## Setup
 

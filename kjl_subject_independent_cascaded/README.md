@@ -202,6 +202,19 @@ Figures are saved under:
 kjl_subject_independent_cascaded/runs/figures
 ```
 
+For the doubled unilateral run, pass the matching run root and dataset roots:
+
+```bash
+python kjl_subject_independent_cascaded/plot_loso_cascade_figures.py \
+  --run-root kjl_subject_independent_cascaded/runs \
+  --summary-csv kjl_subject_independent_cascaded/runs/summary_all_tasks_loso_unilateral4imu_double.csv \
+  --out-dir kjl_subject_independent_cascaded/runs/figures_unilateral4imu_double \
+  --grf-data-root kjl_subject_independent_cascaded/data/grf_unilateral_4imu_double \
+  --kfm-data-root kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double \
+  --kjl-data-root kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double \
+  --overlay-condition 20p200ms_R
+```
+
 ## Notes
 
 - The default upstream targets are `FPR_fz_up_norm_bw` for GRF and `kfm_bwbh` for KFM.

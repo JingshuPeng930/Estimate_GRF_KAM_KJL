@@ -63,19 +63,27 @@ TASK_CONFIG = {
 }
 
 
+def _base_condition(condition: str) -> str:
+    if condition.endswith("_R") or condition.endswith("_L"):
+        return condition[:-2]
+    return condition
+
+
 def _condition_sort_key(condition: str) -> tuple[int, int, str]:
-    if condition == "NoExo":
+    base = _base_condition(condition)
+    side_order = 0 if condition.endswith("_R") else 1 if condition.endswith("_L") else 0
+    if base == "NoExo":
         return (-2, -2, condition)
-    if condition == "NoAssi":
+    if base == "NoAssi":
         return (-1, -1, condition)
-    if "p" in condition and "ms" in condition:
-        left, right = condition.replace("ms", "").split("p", 1)
-        return (int(left), int(right), condition)
+    if "p" in base and "ms" in base:
+        left, right = base.replace("ms", "").split("p", 1)
+        return (int(left), int(right), f"{side_order}_{condition}")
     return (999, 999, condition)
 
 
-def _load_summary(run_root: Path) -> pd.DataFrame:
-    csv_path = run_root / "summary_all_tasks_loso.csv"
+def _load_summary(run_root: Path, summary_csv: Path | None = None) -> pd.DataFrame:
+    csv_path = summary_csv if summary_csv else run_root / "summary_all_tasks_loso.csv"
     if not csv_path.exists():
         raise FileNotFoundError(f"Missing summary CSV: {csv_path}")
     summary = pd.read_csv(csv_path)
@@ -496,17 +504,40 @@ def plot_condition_heatmap(summary: pd.DataFrame, out_dir: Path) -> Path:
 
 
 def main() -> None:
+    global SUBJECTS, KJL_DATA_ROOT, KFM_DATA_ROOT, GRF_DATA_ROOT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
+    parser.add_argument("--summary-csv", type=Path, default=None, help="Optional summary_all_tasks_loso*.csv path.")
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--overlay-condition", default="20p200ms")
+    parser.add_argument("--subjects", nargs="*", default=None, help="Held-out subjects to include. Default: infer from KJL summary rows.")
+    parser.add_argument("--grf-data-root", type=Path, default=GRF_DATA_ROOT)
+    parser.add_argument("--kfm-data-root", type=Path, default=KFM_DATA_ROOT)
+    parser.add_argument("--kjl-data-root", type=Path, default=KJL_DATA_ROOT)
     args = parser.parse_args()
 
     run_root = args.run_root.resolve()
     out_dir = args.out_dir.resolve() if args.out_dir else run_root / "figures"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    summary = _load_summary(run_root)
+    GRF_DATA_ROOT = args.grf_data_root.resolve()
+    KFM_DATA_ROOT = args.kfm_data_root.resolve()
+    KJL_DATA_ROOT = args.kjl_data_root.resolve()
+    TASK_CONFIG["GRF"]["data_root"] = GRF_DATA_ROOT
+    TASK_CONFIG["KFM"]["data_root"] = KFM_DATA_ROOT
+    TASK_CONFIG["KJL"]["data_root"] = KJL_DATA_ROOT
+
+    summary_csv = args.summary_csv.resolve() if args.summary_csv else None
+    summary = _load_summary(run_root, summary_csv)
+    if args.subjects:
+        SUBJECTS = [str(s) for s in args.subjects]
+    else:
+        SUBJECTS = [
+            s for s in SUBJECTS
+            if not summary[(summary["task"] == "KJL") & (summary["held_out_subject"] == s)].empty
+        ]
+    if not SUBJECTS:
+        raise ValueError("No KJL subjects available for plotting.")
     paths = [
         plot_time_overlay(summary, out_dir, args.overlay_condition),
         plot_gait_cycle_mean_sd(summary, out_dir),

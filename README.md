@@ -5,6 +5,7 @@ This repository is organized into three independent code paths:
 | Folder | Purpose |
 | --- | --- |
 | `grf_subject_independent/` | IMU-only vertical GRF estimation with subject-independent LOSO evaluation. |
+| `imu_processing/` | Standalone preprocessing utility for converting IMU_BI raw outputs into filtered 9-IMU CSV files. |
 | `kjl_subject_dependent_cascaded/` | Subject-dependent KJL estimation for AB03 Amy using a cascaded `IMU + predicted GRF + predicted KFM` input. |
 | `kjl_subject_independent_cascaded/` | Subject-independent LOSO KJL estimation using the cascaded `IMU + predicted GRF + predicted KFM` input. |
 

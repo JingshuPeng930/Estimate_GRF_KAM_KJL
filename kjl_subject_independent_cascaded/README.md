@@ -55,6 +55,7 @@ python kjl_subject_independent_cascaded/run_pipeline_GRFKFM_KJL_SI_LOSO.py \
 | `TCN_Training_KJL_AB03_DEP.py` | KJL trainer with optional cascade inputs. |
 | `kjl_ab03_tcn_dataset.py` | Windowed KJL dataloader and label filtering. |
 | `generate_multisubject_kjl_dataset.py` | Builds the KJL dataset and LOSO splits from `KJL_GT` and `IMU_Data_Process`. |
+| `generate_unilateral_grfkfmkjl_datasets.py` | Builds doubled pseudo-right unilateral GRF/KFM/KJL datasets using right-side samples and mirrored left-side samples. |
 | `plot_loso_cascade_figures.py` | Generates time overlays, gait-cycle mean +/- SD plots, task metrics, and agreement plots. |
 | `upstream_grf/` | GRF dataset generator, dataloader, model, and trainer used by the cascade. |
 | `upstream_kfm/` | KFM dataset generator, dataloader, model, and trainer used by the cascade. |
@@ -103,6 +104,49 @@ python kjl_subject_independent_cascaded/generate_multisubject_kjl_dataset.py
 ```
 
 Each generated dataset includes `split_subject_independent_loso_<subject>.json` files used by the pipeline.
+
+### Optional: Doubled Unilateral Dataset
+
+To train a unilateral pseudo-right model with doubled data, generate right-side and mirrored left-side samples:
+
+```bash
+python kjl_subject_independent_cascaded/generate_unilateral_grfkfmkjl_datasets.py \
+  --subjects AB02_Rajiv AB03_Amy AB05_Maria \
+  --height-overrides AB02_Rajiv=1.76
+```
+
+This creates:
+
+```text
+kjl_subject_independent_cascaded/data/grf_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double
+```
+
+Each source trial contributes:
+
+```text
+R sample: pelvis + femur_r + tibia_r + calcn_r -> right GRF/KFM/KJL
+L sample: flipped pelvis + flipped femur_l/tibia_l/calcn_l renamed as pseudo-right -> left GRF/KFM/KJL
+```
+
+The flipped channels for left-side samples are `Acc_Y`, `Gyr_X`, and `Gyr_Z` for pelvis, femur, tibia, and calcaneus. The final input still has 24 channels.
+
+Run the pipeline on this doubled unilateral dataset with:
+
+```bash
+python kjl_subject_independent_cascaded/run_pipeline_GRFKFM_KJL_SI_LOSO.py \
+  --grf-data-root kjl_subject_independent_cascaded/data/grf_unilateral_4imu_double \
+  --kfm-data-root kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double \
+  --kjl-data-root kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double \
+  --output-tag unilateral4imu_double \
+  --window-size 150 \
+  --seed 42 \
+  --grf-epochs 30 \
+  --kfm-epochs 30 \
+  --kjl-epochs 50 \
+  --kjl-lr 1e-5
+```
 
 ## Train LOSO Cascade
 

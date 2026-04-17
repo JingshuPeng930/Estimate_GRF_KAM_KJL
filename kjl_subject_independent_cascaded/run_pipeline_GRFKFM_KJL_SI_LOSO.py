@@ -20,6 +20,21 @@ KJL_DATA_ROOT = PACKAGE_DIR / "data" / "kjl"
 RUN_ROOT = PACKAGE_DIR / "runs"
 
 
+def _data_root(args: argparse.Namespace, task: str) -> Path:
+    if task == "grf" and args.grf_data_root:
+        return Path(args.grf_data_root).resolve()
+    if task == "kfm" and args.kfm_data_root:
+        return Path(args.kfm_data_root).resolve()
+    if task == "kjl" and args.kjl_data_root:
+        return Path(args.kjl_data_root).resolve()
+    return {"grf": GRF_DATA_ROOT, "kfm": KFM_DATA_ROOT, "kjl": KJL_DATA_ROOT}[task]
+
+
+def _run_suffix(args: argparse.Namespace) -> str:
+    tag = str(args.output_tag or "").strip()
+    return f"_{tag}" if tag else ""
+
+
 def _run_train(module_dir: Path, module_name: str, cfg_override: dict) -> dict:
     with tempfile.TemporaryDirectory(prefix="grfkfm_kjl_si_loso_") as td:
         tmp_dir = Path(td)
@@ -51,57 +66,60 @@ def _split_path(data_root: Path, held_out_subject: str) -> Path:
 
 
 def _train_grf(args: argparse.Namespace, held_out_subject: str) -> Path:
+    data_root = _data_root(args, "grf")
     result = _run_train(
         GRF_MODULE_DIR,
         "TCN_Training_GRF_AB03",
         {
-            "run_name": f"GRF_SI_LOSO_{held_out_subject}_TCN_IMU",
+            "run_name": f"GRF_SI_LOSO_{held_out_subject}_TCN_IMU{_run_suffix(args)}",
             "seed": args.seed,
             "seeds": [args.seed],
-            "dataset_root": str(GRF_DATA_ROOT),
-            "split_json": str(_split_path(GRF_DATA_ROOT, held_out_subject)),
+            "dataset_root": str(data_root),
+            "split_json": str(_split_path(data_root, held_out_subject)),
             "target_col": "FPR_fz_up_norm_bw",
             "window_size": args.window_size,
             "batch_size": args.grf_batch_size,
             "epochs": args.grf_epochs,
-            "output_dir": str(RUN_ROOT / "upstream_grf" / held_out_subject),
+            "output_dir": str(RUN_ROOT / f"upstream_grf{_run_suffix(args)}" / held_out_subject),
         },
     )
     return result
 
 
 def _train_kfm(args: argparse.Namespace, held_out_subject: str) -> Path:
+    data_root = _data_root(args, "kfm")
     result = _run_train(
         KFM_MODULE_DIR,
         "TCN_Training_KFM_AB03",
         {
-            "run_name": f"KFM_SI_LOSO_{held_out_subject}_TCN_IMU",
+            "run_name": f"KFM_SI_LOSO_{held_out_subject}_TCN_IMU{_run_suffix(args)}",
             "seed": args.seed,
             "seeds": [args.seed],
-            "dataset_root": str(KFM_DATA_ROOT),
-            "split_json": str(_split_path(KFM_DATA_ROOT, held_out_subject)),
+            "dataset_root": str(data_root),
+            "split_json": str(_split_path(data_root, held_out_subject)),
             "target_col": "kfm_bwbh",
             "window_size": args.window_size,
             "batch_size": args.kfm_batch_size,
             "epochs": args.kfm_epochs,
-            "output_dir": str(RUN_ROOT / "upstream_kfm" / held_out_subject),
+            "output_dir": str(RUN_ROOT / f"upstream_kfm{_run_suffix(args)}" / held_out_subject),
         },
     )
     return result
 
 
 def _train_kjl(args: argparse.Namespace, held_out_subject: str, grf_run_dir: Path, kfm_run_dir: Path) -> dict:
+    data_root = _data_root(args, "kjl")
     return _run_train(
         KJL_MODULE_DIR,
         "TCN_Training_KJL_AB03_DEP",
         {
-            "run_name": f"KJL_SI_LOSO_{held_out_subject}_TCN_DEP_CASCADE_GRFKFM",
+            "run_name": f"KJL_SI_LOSO_{held_out_subject}_TCN_DEP_CASCADE_GRFKFM{_run_suffix(args)}",
             "seed": args.seed,
             "seeds": [args.seed],
-            "dataset_root": str(KJL_DATA_ROOT),
-            "split_json": str(_split_path(KJL_DATA_ROOT, held_out_subject)),
+            "dataset_root": str(data_root),
+            "split_json": str(_split_path(data_root, held_out_subject)),
             "target_col": "knee_r_on_tibia_r_in_tibia_r_fy_norm_totalmodel_bw",
-            "output_dir": str(RUN_ROOT / "kjl_cascade" / held_out_subject),
+            "output_dir": str(RUN_ROOT / f"kjl_cascade{_run_suffix(args)}" / held_out_subject),
             "window_size": args.window_size,
             "batch_size": args.kjl_batch_size,
             "epochs": args.kjl_epochs,
@@ -148,6 +166,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--kfm-batch-size", type=int, default=32)
     parser.add_argument("--kjl-batch-size", type=int, default=32)
     parser.add_argument("--kjl-lr", type=float, default=1e-5)
+    parser.add_argument("--grf-data-root", default="", help="Override GRF dataset root.")
+    parser.add_argument("--kfm-data-root", default="", help="Override KFM dataset root.")
+    parser.add_argument("--kjl-data-root", default="", help="Override KJL dataset root.")
+    parser.add_argument("--output-tag", default="", help="Suffix for run names and output folders, e.g. unilateral4imu.")
     parser.add_argument(
         "--cascade-prediction-mode",
         choices=["normalized", "denormalized"],
@@ -216,10 +238,10 @@ def main() -> None:
         all_results.append(kjl_result)
         print(f"[LOSO] KJL run: {kjl_result['out_dir']}")
 
-    summary_path = RUN_ROOT / "summary_loso.json"
+    summary_path = RUN_ROOT / f"summary_loso{_run_suffix(args)}.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(json.dumps(all_results, indent=2), encoding="utf-8")
-    summary_csv_path = RUN_ROOT / "summary_all_tasks_loso.csv"
+    summary_csv_path = RUN_ROOT / f"summary_all_tasks_loso{_run_suffix(args)}.csv"
     _write_summary_csv(summary_rows, summary_csv_path)
     print("\nDone.")
     print(f"Summary: {summary_path}")

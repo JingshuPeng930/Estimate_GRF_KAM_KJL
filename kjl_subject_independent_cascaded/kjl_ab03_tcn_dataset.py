@@ -12,6 +12,22 @@ from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 
 TARGET_COL = "knee_r_on_tibia_r_in_tibia_r_fy_norm_totalmodel_bw"
+LEFT_TARGET_COL = "knee_l_on_tibia_l_in_tibia_l_fy_norm_totalmodel_bw"
+PSEUDO_IMU_COLS = [
+    "pelvis_imu_acc_x", "pelvis_imu_acc_y", "pelvis_imu_acc_z",
+    "tibia_r_imu_acc_x", "tibia_r_imu_acc_y", "tibia_r_imu_acc_z",
+    "femur_r_imu_acc_x", "femur_r_imu_acc_y", "femur_r_imu_acc_z",
+    "calcn_r_imu_acc_x", "calcn_r_imu_acc_y", "calcn_r_imu_acc_z",
+    "pelvis_imu_gyr_x", "pelvis_imu_gyr_y", "pelvis_imu_gyr_z",
+    "tibia_r_imu_gyr_x", "tibia_r_imu_gyr_y", "tibia_r_imu_gyr_z",
+    "femur_r_imu_gyr_x", "femur_r_imu_gyr_y", "femur_r_imu_gyr_z",
+    "calcn_r_imu_gyr_x", "calcn_r_imu_gyr_y", "calcn_r_imu_gyr_z",
+]
+RAW_IMU_COLS = sorted({
+    c.replace("_r_", "_l_") if any(seg in c for seg in ("tibia_r", "femur_r", "calcn_r")) else c
+    for c in PSEUDO_IMU_COLS
+} | set(PSEUDO_IMU_COLS))
+FLIP_COMPONENTS = {"acc_y", "gyr_x", "gyr_z"}
 
 # Low-pass filter applied to the KJL label before training/evaluation.
 # OpenSim inverse dynamics can produce numerical spikes (max sample-to-sample
@@ -25,6 +41,11 @@ LABEL_FS_HZ: float = 100.0
 _COND_RE = re.compile(r"^(?P<torque>\d+)p(?P<delay>\d+)ms$")
 
 
+def _component(col: str) -> str:
+    parts = col.split("_")
+    return f"{parts[-2]}_{parts[-1]}"
+
+
 def _filter_label(y: np.ndarray) -> np.ndarray:
     """Apply zero-phase Butterworth low-pass filter to the label column."""
     if LABEL_FILTER_CUTOFF_HZ is None or len(y) < 15:
@@ -34,32 +55,70 @@ def _filter_label(y: np.ndarray) -> np.ndarray:
     return spsignal.filtfilt(b, a, y.ravel()).reshape(-1, 1).astype(np.float32)
 
 
+def _has_raw_bilateral_columns(input_df: pd.DataFrame, label_df: pd.DataFrame) -> bool:
+    return all(c in input_df.columns for c in RAW_IMU_COLS) and LEFT_TARGET_COL in label_df.columns
+
+
+def _raw_side_label_col(target_col: str, side: str, label_df: pd.DataFrame, label_path: Path) -> str:
+    if side == "R":
+        return target_col
+    left_col = target_col.replace("_r_", "_l_")
+    if left_col == target_col and target_col == TARGET_COL:
+        left_col = LEFT_TARGET_COL
+    if left_col not in label_df.columns:
+        raise ValueError(f"Missing left target column `{left_col}` in {label_path}")
+    return left_col
+
+
+def _raw_side_input(input_df: pd.DataFrame, side: str) -> pd.DataFrame:
+    out = pd.DataFrame(index=input_df.index)
+    for col in PSEUDO_IMU_COLS:
+        if col.startswith("pelvis_imu_"):
+            src = col
+        elif side == "R":
+            src = col
+        else:
+            src = col.replace("_r_", "_l_")
+        values = input_df[src].to_numpy(dtype=np.float32).copy()
+        if side == "L" and _component(col) in FLIP_COMPONENTS:
+            values *= -1.0
+        out[col] = values
+    return out
+
+
 def _load_trial_arrays(
     trial_dir: Path,
     target_col: str = TARGET_COL,
     row_start: int = 0,
     row_end: int = None,
     exclude_feature_cols: Sequence[str] | None = None,
+    side: str | None = None,
 ):
     input_path = trial_dir / "Input" / "imu.csv"
     label_path = trial_dir / "Label" / "kjl_fy.csv"
 
     input_df = pd.read_csv(input_path)
     label_df = pd.read_csv(label_path)
+    side = (side or "R").upper()
+    if side not in {"R", "L"}:
+        raise ValueError(f"Unsupported side `{side}` for {trial_dir}")
 
     exclude_set = {str(c) for c in (exclude_feature_cols or [])}
-    feature_cols = [
-        c
-        for c in input_df.columns
-        if c not in ("sample_idx", "time_imu") and c not in exclude_set
-    ]
+    is_raw_bilateral = _has_raw_bilateral_columns(input_df, label_df)
+    if is_raw_bilateral:
+        feature_df = _raw_side_input(input_df, side)
+        label_col = _raw_side_label_col(target_col, side, label_df, label_path)
+    else:
+        feature_df = input_df.drop(columns=[c for c in ("sample_idx", "time_imu") if c in input_df.columns])
+        label_col = target_col
+    feature_cols = [c for c in feature_df.columns if c not in exclude_set]
     if not feature_cols:
         raise ValueError(f"No input features left after exclusion for {input_path}")
-    if target_col not in label_df.columns:
-        raise ValueError(f"Missing target column `{target_col}` in {label_path}")
+    if label_col not in label_df.columns:
+        raise ValueError(f"Missing target column `{label_col}` in {label_path}")
 
-    x = input_df[feature_cols].to_numpy(dtype=np.float32)
-    y = label_df[[target_col]].to_numpy(dtype=np.float32)
+    x = feature_df[feature_cols].to_numpy(dtype=np.float32)
+    y = label_df[[label_col]].to_numpy(dtype=np.float32)
 
     # Filter BEFORE slicing so edge effects from filtfilt don't contaminate
     # the temporal split boundary.
@@ -68,6 +127,16 @@ def _load_trial_arrays(
     n = min(len(x), len(y))
     row_end_actual = n if row_end is None else min(row_end, n)
     return x[row_start:row_end_actual], y[row_start:row_end_actual], feature_cols
+
+
+def _trial_sides(trial_dir: Path) -> tuple[str, ...]:
+    input_path = trial_dir / "Input" / "imu.csv"
+    label_path = trial_dir / "Label" / "kjl_fy.csv"
+    input_cols = pd.read_csv(input_path, nrows=0).columns
+    label_cols = pd.read_csv(label_path, nrows=0).columns
+    if all(c in input_cols for c in RAW_IMU_COLS) and LEFT_TARGET_COL in label_cols:
+        return ("R", "L")
+    return ("R",)
 
 
 class WindowedTrialDataset(Dataset):
@@ -98,29 +167,31 @@ class WindowedTrialDataset(Dataset):
 
         for tdir in self.trial_dirs:
             rng = self.row_ranges.get(str(tdir), (0, None))
-            x, y, cols = _load_trial_arrays(
-                tdir,
-                target_col=self.target_col,
-                row_start=rng[0],
-                row_end=rng[1],
-                exclude_feature_cols=self.exclude_feature_cols,
-            )
-            if len(x) < self.window_size:
-                continue
-            if self.feature_cols is None:
-                self.feature_cols = cols
-            elif cols != self.feature_cols:
-                raise ValueError(
-                    f"Inconsistent feature columns across trials. "
-                    f"Expected {self.feature_cols}, got {cols} in {tdir}"
+            for side in _trial_sides(tdir):
+                x, y, cols = _load_trial_arrays(
+                    tdir,
+                    target_col=self.target_col,
+                    row_start=rng[0],
+                    row_end=rng[1],
+                    exclude_feature_cols=self.exclude_feature_cols,
+                    side=side,
                 )
-            self.trials_x.append(x)
-            self.trials_y.append(y)
-            self.kept_trial_dirs.append(tdir)
-            cond = tdir.parts[-2]
-            m = _COND_RE.match(cond)
-            self.trial_delay_ms.append(int(m.group("delay")) if m else -1)
-            self.index_map.extend((len(self.trials_x) - 1, i) for i in range(len(x) - self.window_size + 1))
+                if len(x) < self.window_size:
+                    continue
+                if self.feature_cols is None:
+                    self.feature_cols = cols
+                elif cols != self.feature_cols:
+                    raise ValueError(
+                        f"Inconsistent feature columns across trials. "
+                        f"Expected {self.feature_cols}, got {cols} in {tdir} side={side}"
+                    )
+                self.trials_x.append(x)
+                self.trials_y.append(y)
+                self.kept_trial_dirs.append(tdir)
+                cond = tdir.parts[-2]
+                m = _COND_RE.match(cond)
+                self.trial_delay_ms.append(int(m.group("delay")) if m else -1)
+                self.index_map.extend((len(self.trials_x) - 1, i) for i in range(len(x) - self.window_size + 1))
 
         if not self.trials_x:
             raise ValueError("No valid trials found for dataset.")

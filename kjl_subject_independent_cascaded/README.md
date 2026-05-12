@@ -38,6 +38,27 @@ kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double
 kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double
 ```
 
+This folder also includes a raw combined unilateral KJL archive:
+
+```text
+kjl_subject_independent_cascaded/data_archive/kjl_raw_unilateral_4imu_combined.tar.gz
+```
+
+Unpack it with:
+
+```bash
+python kjl_subject_independent_cascaded/unpack_generated_data.py \
+  --archive kjl_subject_independent_cascaded/data_archive/kjl_raw_unilateral_4imu_combined.tar.gz
+```
+
+It creates:
+
+```text
+kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_raw_combined
+```
+
+Each trial folder contains one raw bilateral `Input/imu.csv` and one bilateral `Label/kjl_fy.csv`. The KJL dataloader expands each trial into right and left unilateral samples during training; left-side IMU channels are mirrored to the pseudo-right 24-channel convention only inside the dataloader.
+
 Then train all LOSO folds:
 
 ```bash
@@ -59,6 +80,7 @@ python kjl_subject_independent_cascaded/run_pipeline_GRFKFM_KJL_SI_LOSO.py \
 | `kjl_ab03_tcn_dataset.py` | Windowed KJL dataloader and label filtering. |
 | `generate_multisubject_kjl_dataset.py` | Builds the KJL dataset and LOSO splits from `KJL_GT` and `IMU_Data_Process`. |
 | `generate_unilateral_grfkfmkjl_datasets.py` | Builds doubled pseudo-right unilateral GRF/KFM/KJL datasets using right-side samples and mirrored left-side samples. |
+| `generate_raw_unilateral_kjl_dataset.py` | Builds raw combined unilateral KJL trials with raw left/right IMU columns and left/right KJL label columns. |
 | `plot_loso_cascade_figures.py` | Generates time overlays, gait-cycle mean +/- SD plots, task metrics, and agreement plots. |
 | `upstream_grf/` | GRF dataset generator, dataloader, model, and trainer used by the cascade. |
 | `upstream_kfm/` | KFM dataset generator, dataloader, model, and trainer used by the cascade. |
@@ -72,6 +94,7 @@ kjl_subject_independent_cascaded/data/kjl
 kjl_subject_independent_cascaded/data/grf_unilateral_4imu_double
 kjl_subject_independent_cascaded/data/kfm_unilateral_4imu_double
 kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_double
+kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_raw_combined
 kjl_subject_independent_cascaded/runs
 ```
 
@@ -137,6 +160,23 @@ L sample: flipped pelvis + flipped femur_l/tibia_l/calcn_l renamed as pseudo-rig
 ```
 
 The flipped channels for left-side samples are `Acc_Y`, `Gyr_X`, and `Gyr_Z` for pelvis, femur, tibia, and calcaneus. The final input still has 24 channels.
+
+### Optional: Raw Combined Unilateral KJL Dataset
+
+To keep the data raw on disk and mirror left-side channels only during training, generate the raw combined KJL dataset:
+
+```bash
+python kjl_subject_independent_cascaded/generate_raw_unilateral_kjl_dataset.py \
+  --subjects AB02_Rajiv AB03_Amy AB05_Maria
+```
+
+This creates:
+
+```text
+kjl_subject_independent_cascaded/data/kjl_unilateral_4imu_raw_combined
+```
+
+Folder names no longer include `_R` or `_L`; each source condition has a single `trial_1` folder. `Input/imu.csv` keeps raw `*_l_*` and `*_r_*` IMU columns, and `Label/kjl_fy.csv` keeps both right and left KJL columns. When the KJL dataloader sees this format, it trains on both sides by reading the right side directly and mirroring the left side in memory.
 
 Run the pipeline on this doubled unilateral dataset with:
 
